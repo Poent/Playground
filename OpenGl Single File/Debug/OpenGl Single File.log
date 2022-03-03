@@ -1,0 +1,7 @@
+﻿  Source.cpp
+Source.obj : error LNK2019: unresolved external symbol _glfwInit referenced in function _main
+Source.obj : error LNK2019: unresolved external symbol _glfwTerminate referenced in function _main
+Source.obj : error LNK2019: unresolved external symbol _glfwCreateWindow referenced in function _main
+Source.obj : error LNK2019: unresolved external symbol _glfwMakeContextCurrent referenced in function _main
+C:\Users\wmartin\Documents\GitHub\Poent\OpenGl Single File\Dependencies\GLFW\lib-vc2019\glfw3.lib : warning LNK4272: library machine type 'x64' conflicts with target machine type 'x86'
+C:\Users\wmartin\Documents\GitHub\Poent\OpenGl Single File\Debug\OpenGl Single File.exe : fatal error LNK1120: 4 unresolved externals

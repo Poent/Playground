@@ -1,0 +1,11 @@
+{
+  "Version": 1,
+  "ProjectMap": {
+    "fdcbfabd-05a9-4ac6-8376-759232994c6d": {
+      "ProjectGuid": "fdcbfabd-05a9-4ac6-8376-759232994c6d",
+      "DisplayName": "OpenGl Single File",
+      "ColorIndex": 0
+    }
+  },
+  "NextColorIndex": 1
+}
