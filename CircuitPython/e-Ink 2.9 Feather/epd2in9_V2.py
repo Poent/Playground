@@ -27,29 +27,32 @@
 # THE SOFTWARE.
 #
 
+
+# MODIFICATIONS FROM ORIGINAL
+# Removed dependancy on python image library (PIL)
+# Implementing display based on CircuitPython compatible modules.
+
 import board
 import busio
 import time
 import digitalio
 
-# Display resolution
+# Display resolution (I think these are backwards. need to fix)
 EPD_WIDTH       = 296
 EPD_HEIGHT      = 160
 
 
 
 class EPD:
-    # initial construction
-    # Setup SPI Pins (NEED TO CONFIRM)
 
 
     def __init__(self):
             
         # SPI setup
 
-        # Setup Chip Selec
-        self.cs             = digitalio.DigitalInOut(board.RX)      # Chip Select
-        self.cs.direction   = digitalio.Direction.OUTPUT            # Set CS pin mode
+        # Setup Chip Select
+        self.cs             = digitalio.DigitalInOut(board.RX)
+        self.cs.direction   = digitalio.Direction.OUTPUT
         self.cs.value       = True
         
         # Setup reset switch
@@ -80,35 +83,8 @@ class EPD:
         self.spi.configure(baudrate=1200, phase=0, polarity=0)
 
 
-
-
-        
-    
-#     # # probably has something to do with partial refresh?
-#     # WF_PARTIAL_2IN9 = [
-#     # 0x0,0x40,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,
-#     # 0x80,0x80,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,
-#     # 0x40,0x40,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,
-#     # 0x0,0x80,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,
-#     # 0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,
-#     # 0x0A,0x0,0x0,0x0,0x0,0x0,0x1,  
-#     # 0x1,0x0,0x0,0x0,0x0,0x0,0x0,
-#     # 0x1,0x0,0x0,0x0,0x0,0x0,0x0,
-#     # 0x0,0x0,0x0,0x0,0x0,0x0,0x0,
-#     # 0x0,0x0,0x0,0x0,0x0,0x0,0x0,
-#     # 0x0,0x0,0x0,0x0,0x0,0x0,0x0,
-#     # 0x0,0x0,0x0,0x0,0x0,0x0,0x0,
-#     # 0x0,0x0,0x0,0x0,0x0,0x0,0x0,
-#     # 0x0,0x0,0x0,0x0,0x0,0x0,0x0,
-#     # 0x0,0x0,0x0,0x0,0x0,0x0,0x0,
-#     # 0x0,0x0,0x0,0x0,0x0,0x0,0x0,
-#     # 0x0,0x0,0x0,0x0,0x0,0x0,0x0,
-#     # 0x22,0x22,0x22,0x22,0x22,0x22,0x0,0x0,0x0,
-#     # 0x22,0x17,0x41,0xB0,0x32,0x36,
-#     # ]
-
-    # no idea - some block of bytes
-    # setting up a Lookup Table (LUT)??
+    # setting up a Lookup Table (LUT)
+    # I'm not sure where these values come from?
     WS_20_30 = [									
     0x80,	0x66,	0x0,	0x0,	0x0,	0x0,	0x0,	0x0,	0x40,	0x0,	0x0,	0x0,
     0x10,	0x66,	0x0,	0x0,	0x0,	0x0,	0x0,	0x0,	0x20,	0x0,	0x0,	0x0,
@@ -142,6 +118,7 @@ class EPD:
         time.sleep(0.010)   
         print("sent...")
 
+# function to send commands to the didsplay (lower DC and send command byte)
     def send_command(self, command):
         self.dc.value = False
         self.cs.value = False
@@ -149,7 +126,7 @@ class EPD:
         self.cs.value = True
 
 
-
+# function to send a data to the display (Raise DC and send a single byte)
     def send_data(self, data):
         self.dc.value = True
         self.cs.value = False
@@ -157,7 +134,7 @@ class EPD:
         self.cs.value = True
 
 
-#     # send a lot of data   
+# finction to send a lot of data to the display. 
     def send_data2(self, data):
         buffer = bytearray(data)
         self.dc.value = True
@@ -165,14 +142,6 @@ class EPD:
         self.spi.write(buffer)
         self.cs.value = True
 
-
-        # for i in range(len(buffer)):
-        #     print(hex(buffer[i]))
-        #     self.spi.write(hex(buffer[i]))
-        # epdconfig.digital_write(self.dc_pin, 1)
-        # epdconfig.digital_write(self.cs_pin, 0)
-        # epdconfig.spi_writebyte2(data)
-        # epdconfig.digital_write(self.cs_pin, 1)
         
     
 #     # Function to check the status of the "busy" pin. High while the display is "doing stuff".
@@ -184,6 +153,7 @@ class EPD:
             time.sleep(0.01) 
         print("e-Paper busy release")  
 
+# Call this after we have set all the RAM bits to black or white. This is the main update process
     def TurnOnDisplay(self):
         print('turn on display')
         self.send_command(0x22) # DISPLAY_UPDATE_CONTROL_2
@@ -216,6 +186,15 @@ class EPD:
         self.send_command(0x2c);		# VCOM
         self.send_data(lut[158])
 
+# I don't understand how this works. The function is here to set window parameters for the display. 
+# specifically this sets the start and end addresses.
+
+# I have confirmed that this works, but I do not understand why or how. 
+# the display itself is a 296 x 128 pixel display, which means that it should need 4,736 bytes of storage
+# for it to hold the entire display worth of data. 
+
+
+
     def SetWindow(self, x_start, y_start, x_end, y_end):
         self.send_command(0x44) # SET_RAM_X_ADDRESS_START_END_POSITION
         # x point must be the multiple of 8 or the last 3 bits will be ignored
@@ -225,7 +204,7 @@ class EPD:
         # self.send_data((x_start>>3) & 0xFF)
         # self.send_data((x_end>>3) & 0xFF)
         self.send_command(0x45) # SET_RAM_Y_ADDRESS_START_END_POSITION
-        self.send_data(0x28)
+        self.send_data(0x27)
         self.send_data(0x01)
         self.send_data(0x00)
         self.send_data(0x00)
@@ -265,11 +244,6 @@ class EPD:
         self.send_command(0x11) #data entry mode   (command to set data entry parameters)
         self.send_data(0x11) # tell it to use option "11" (3 in binary) to increment in -Y +X direction
 
-        # This function combines sending commands 0x44 and 0x45
-        # Each sets the start and end position of the window, respectively. 
-
-
-
         self.send_command(0x21) #  Display update control
         self.send_data(0x00)
         self.send_data(0x80)
@@ -283,36 +257,6 @@ class EPD:
         # EPD hardware init end
         return 0
 
-#     def getbuffer(self, image):
-#         # print("bufsiz = ",int(self.width/8) * self.height)
-#         buf = [0xFF] * (int(self.width/8) * self.height)
-#         image_monocolor = image.convert('1')
-#         imwidth, imheight = image_monocolor.size
-#         pixels = image_monocolor.load()
-#         # print("imwidth = %d, imheight = %d",imwidth,imheight)
-#         if(imwidth == self.width and imheight == self.height):
-#             print("Vertical")
-#             for y in range(imheight):
-#                 for x in range(imwidth):
-#                     # Set the bits for the column of pixels at the current position.
-#                     if pixels[x, y] == 0:
-#                         buf[int((x + y * self.width) / 8)] &= ~(0x80 >> (x % 8))
-#         elif(imwidth == self.height and imheight == self.width):
-#             print("Horizontal")
-#             for y in range(imheight):
-#                 for x in range(imwidth):
-#                     newx = y
-#                     newy = self.height - x - 1
-#                     if pixels[x, y] == 0:
-#                         buf[int((newx + newy*self.width) / 8)] &= ~(0x80 >> (y % 8))
-#         return buf
-
-#     def display(self, image):
-#         if (image == None):
-#             return            
-#         self.send_command(0x24) # WRITE_RAM
-#         self.send_data2(image)   
-#         self.TurnOnDisplay()
 
     def display(self, pattern):
         if (pattern == None):
@@ -320,55 +264,6 @@ class EPD:
         self.send_command(0x24) # WRITE_RAM
         self.send_data2(pattern)   
         self.TurnOnDisplay()
-
-#     def display_Base(self, image):
-#         if (image == None):
-#             return   
-            
-#         self.send_command(0x24) # WRITE_RAM
-#         self.send_data2(image)
-                
-#         self.send_command(0x26) # WRITE_RAM
-#         self.send_data2(image)   
-                
-#         self.TurnOnDisplay()
-        
-#     def display_Partial(self, image):
-#         if (image == None):
-#             return
-            
-#         epdconfig.digital_write(self.reset_pin, 0)
-#         epdconfig.delay_ms(2)
-#         epdconfig.digital_write(self.reset_pin, 1)
-#         epdconfig.delay_ms(2)   
-        
-#         self.SetLut(self.WF_PARTIAL_2IN9)
-#         self.send_command(0x37)
-#         self.send_data(0x00)
-#         self.send_data(0x00)
-#         self.send_data(0x00)
-#         self.send_data(0x00)
-#         self.send_data(0x00)
-#         self.send_data(0x40)
-#         self.send_data(0x00)
-#         self.send_data(0x00)
-#         self.send_data(0x00)  
-#         self.send_data(0x00)
-
-#         self.send_command(0x3C) #BorderWavefrom
-#         self.send_data(0x80)
-
-#         self.send_command(0x22) 
-#         self.send_data(0xC0)
-#         self.send_command(0x20)
-#         self.ReadBusy()
-
-#         self.SetWindow(0, 0, self.width - 1, self.height - 1)
-#         self.SetCursor(0, 0)
-        
-#         self.send_command(0x24) # WRITE_RAM
-#         self.send_data2(image)   
-#         self.TurnOnDisplay_Partial()
 
     def Clear(self, color):
         if self.width%8 == 0:
