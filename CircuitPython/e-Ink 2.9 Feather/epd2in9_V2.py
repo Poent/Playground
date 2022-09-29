@@ -37,9 +37,9 @@ import busio
 import time
 import digitalio
 
-# Display resolution (I think these are backwards. need to fix)
+# Display resolution.
 EPD_WIDTH       = 296
-EPD_HEIGHT      = 160
+EPD_HEIGHT      = 128
 
 
 
@@ -75,7 +75,7 @@ class EPD:
         self.height = EPD_HEIGHT
 
         # Setup SPI class
-        self.spi = busio.SPI(board.SCK, MOSI=board.MOSI)             #hope these pins are correct!
+        self.spi = busio.SPI(board.SCK, MOSI=board.MOSI)
 
         while not self.spi.try_lock():
             pass
@@ -107,7 +107,7 @@ class EPD:
     0x22,	0x17,	0x41,	0x0,	0x32,	0x36
     ]
 
-    # Hardware reset
+    # Hardware reset 
     def reset(self):
         print("Reset sending...")
         self.rst.value = True
@@ -167,6 +167,7 @@ class EPD:
 #         self.send_command(0x20) # MASTER_ACTIVATION
 #         self.ReadBusy()
 
+    #load the LUT
     def lut(self, lut):
         self.send_command(0x32)
         for i in range(0, 153):
@@ -188,27 +189,31 @@ class EPD:
 
 # I don't understand how this works. The function is here to set window parameters for the display. 
 # specifically this sets the start and end addresses.
-
 # I have confirmed that this works, but I do not understand why or how. 
 # the display itself is a 296 x 128 pixel display, which means that it should need 4,736 bytes of storage
 # for it to hold the entire display worth of data. 
 
-
-
     def SetWindow(self, x_start, y_start, x_end, y_end):
+        
+        # We're totally ignoring the function parameters here. We know that the display is 296x128 pixels.
+        # the example code was doing bit-shift operations but it didn't work (results in screen static). 
+                
         self.send_command(0x44) # SET_RAM_X_ADDRESS_START_END_POSITION
-        # x point must be the multiple of 8 or the last 3 bits will be ignored
+        
+        # Data values pulled directly from Reference code on datasheet. 
         self.send_data(0x00)
         self.send_data(0x18)
-
-        # self.send_data((x_start>>3) & 0xFF)
-        # self.send_data((x_end>>3) & 0xFF)
+        
         self.send_command(0x45) # SET_RAM_Y_ADDRESS_START_END_POSITION
         self.send_data(0x27)
         self.send_data(0x01)
         self.send_data(0x00)
         self.send_data(0x00)
-
+        
+        # old example code, didn't work either
+        # self.send_data((x_start>>3) & 0xFF)
+        # self.send_data((x_end>>3) & 0xFF)
+        # self.send_command(0x45) # SET_RAM_Y_ADDRESS_START_END_POSITION
         # self.send_data(y_start & 0xFF)
         # self.send_data((y_start >> 8) & 0xFF)
         # self.send_data(y_end & 0xFF)
@@ -252,7 +257,8 @@ class EPD:
         self.ReadBusy()
 
         self.SetLut(self.WS_20_30)
-
+        
+        #not currently using the parameters in the function.
         self.SetWindow(0, 0, self.width-1, self.height-1)
         # EPD hardware init end
         return 0
