@@ -32,40 +32,47 @@
 # Removed dependancy on python image library (PIL)
 # Implementing display based on CircuitPython compatible modules.
 
+
 import board
 import busio
 import time
 import digitalio
 
-# Display resolution (I think these are backwards. need to fix)
-EPD_WIDTH       = 296
-EPD_HEIGHT      = 160
+# Display resolution (2.9" e-paper display resolution)
+# might be backwards...
+EPD_WIDTH       = 128
+EPD_HEIGHT      = 296
 
 
+# SPI Pin mapping
+# Adafruit Feather NRF52840
+cs   = board.RX
+rst  = board.D5
+dc   = board.D2
+busy = board.TX
+sck  = board.SCK
+MOSI = board.MOSI
 
 class EPD:
-
-
     def __init__(self):
             
         # SPI setup
-
         # Setup Chip Select
-        self.cs             = digitalio.DigitalInOut(board.RX)
+        self.cs             = digitalio.DigitalInOut(cs)
         self.cs.direction   = digitalio.Direction.OUTPUT
         self.cs.value       = True
         
         # Setup reset switch
-        self.rst            = digitalio.DigitalInOut(board.D5)
-        self.rst.direction            = digitalio.Direction.OUTPUT
+        self.rst            = digitalio.DigitalInOut(rst)
+        self.rst.direction  = digitalio.Direction.OUTPUT
         self.rst.value      = True
 
         # Setup Data / Control pin
-        self.dc             = digitalio.DigitalInOut(board.D2)
+        self.dc             = digitalio.DigitalInOut(dc)
         self.dc.direction   = digitalio.Direction.OUTPUT
 
         # Setup busy signal pin
-        self.busy           = digitalio.DigitalInOut(board.TX)
+        self.busy           = digitalio.DigitalInOut(busy)
         self.busy.direction = digitalio.Direction.INPUT
         self.busy.pull      = digitalio.Pull.DOWN
 
@@ -75,16 +82,17 @@ class EPD:
         self.height = EPD_HEIGHT
 
         # Setup SPI class
-        self.spi = busio.SPI(board.SCK, MOSI=board.MOSI)             #hope these pins are correct!
+        self.spi = busio.SPI(sck, MOSI)         
 
         while not self.spi.try_lock():
             pass
 
-        self.spi.configure(baudrate=1200, phase=0, polarity=0)
+        # Baudrate can be increased, though datasheet recommends keeping it low to avoid data loss
+        self.spi.configure(baudrate=9600, phase=0, polarity=0)
 
 
     # setting up a Lookup Table (LUT)
-    # I'm not sure where these values come from?
+    # straight from the example code...
     WS_20_30 = [									
     0x80,	0x66,	0x0,	0x0,	0x0,	0x0,	0x0,	0x0,	0x40,	0x0,	0x0,	0x0,
     0x10,	0x66,	0x0,	0x0,	0x0,	0x0,	0x0,	0x0,	0x20,	0x0,	0x0,	0x0,
@@ -107,7 +115,7 @@ class EPD:
     0x22,	0x17,	0x41,	0x0,	0x32,	0x36
     ]
 
-    # Hardware reset
+# Hardware reset function
     def reset(self):
         print("Reset sending...")
         self.rst.value = True
@@ -118,7 +126,7 @@ class EPD:
         time.sleep(0.010)   
         print("sent...")
 
-# function to send commands to the didsplay (lower DC and send command byte)
+# function to send commands to the didsplay (set DC LOW and send command byte)
     def send_command(self, command):
         self.dc.value = False
         self.cs.value = False
@@ -126,7 +134,7 @@ class EPD:
         self.cs.value = True
 
 
-# function to send a data to the display (Raise DC and send a single byte)
+# function to send a data to the display (set DC HIGH and send a single byte)
     def send_data(self, data):
         self.dc.value = True
         self.cs.value = False
@@ -134,7 +142,7 @@ class EPD:
         self.cs.value = True
 
 
-# finction to send a lot of data to the display. 
+# function to send a lot of data to the display. Usually used when drawing to the display. 
     def send_data2(self, data):
         buffer = bytearray(data)
         self.dc.value = True
@@ -144,16 +152,16 @@ class EPD:
 
         
     
-#     # Function to check the status of the "busy" pin. High while the display is "doing stuff".
-#     # Must wait for the display to be ready before doing anything else.
-#     # Will likely call this after every command is sent. 
+# Function to check the status of the "busy" pin. High while the display is "doing stuff".
+# Must wait for the display to be ready before doing anything else.
+# Will likely call this after every command is sent. 
     def ReadBusy(self):
         print("e-Paper busy")
         while(self.busy == True):      #  0: idle, 1: busy
             time.sleep(0.01) 
         print("e-Paper busy release")  
 
-# Call this after we have set all the RAM bits to black or white. This is the main update process
+# Call this after we have set all the RAM bits to black or white. This is the main draw function
     def TurnOnDisplay(self):
         print('turn on display')
         self.send_command(0x22) # DISPLAY_UPDATE_CONTROL_2
@@ -161,18 +169,14 @@ class EPD:
         self.send_command(0x20) # MASTER_ACTIVATION
         self.ReadBusy()
 
-#     def TurnOnDisplay_Partial(self):
-#         self.send_command(0x22) # DISPLAY_UPDATE_CONTROL_2
-#         self.send_data(0x0F)
-#         self.send_command(0x20) # MASTER_ACTIVATION
-#         self.ReadBusy()
-
+# send LUT settings
     def lut(self, lut):
         self.send_command(0x32)
         for i in range(0, 153):
             self.send_data(lut[i])
         self.ReadBusy()
 
+#no idea
     def SetLut(self, lut):
         self.lut(lut)
         self.send_command(0x3f)
@@ -186,42 +190,41 @@ class EPD:
         self.send_command(0x2c);		# VCOM
         self.send_data(lut[158])
 
-# I don't understand how this works. The function is here to set window parameters for the display. 
-# specifically this sets the start and end addresses.
-
-# I have confirmed that this works, but I do not understand why or how. 
-# the display itself is a 296 x 128 pixel display, which means that it should need 4,736 bytes of storage
-# for it to hold the entire display worth of data. 
-
-
+# This function sets the start and stop address for the current "window".
+# You can set a smaller or larger window to draw within a set boundry. 
+# Additional code would need to be added to scale this window. 
 
     def SetWindow(self, x_start, y_start, x_end, y_end):
+
+        # CURRENTLY IGNORING PARAMETERS FOR DEBUGGING
+
         self.send_command(0x44) # SET_RAM_X_ADDRESS_START_END_POSITION
+        
         # x point must be the multiple of 8 or the last 3 bits will be ignored
-        self.send_data(0x00)
-        self.send_data(0x18)
-
-        # self.send_data((x_start>>3) & 0xFF)
+        self.send_data(1) # X_MIN = 1
+        self.send_data(16) # X_MAX = 128/8
         # self.send_data((x_end>>3) & 0xFF)
+
         self.send_command(0x45) # SET_RAM_Y_ADDRESS_START_END_POSITION
-        self.send_data(0x27)
-        self.send_data(0x01)
+        
+        #this gets weird. We need to send "127" fo the max window size
+        self.send_data(0x28)
+        self.send_data(0x01)        
         self.send_data(0x00)
         self.send_data(0x00)
 
-        # self.send_data(y_start & 0xFF)
-        # self.send_data((y_start >> 8) & 0xFF)
-        # self.send_data(y_end & 0xFF)
-        # self.send_data((y_end >> 8) & 0xFF)
+
 
     def SetCursor(self, x, y): 
         self.send_command(0x4E) # SET_RAM_X_ADDRESS_COUNTER
         # x point must be the multiple of 8 or the last 3 bits will be ignored
-        self.send_data(x & 0xFF)
+        self.send_data(0x01)
         
+
+
         self.send_command(0x4F) # SET_RAM_Y_ADDRESS_COUNTER
-        self.send_data(y & 0xFF)
-        self.send_data((y >> 8) & 0xFF)
+        self.send_data(0x00)
+        self.send_data(0x00)
         
     def init(self):
         
@@ -242,18 +245,18 @@ class EPD:
         self.send_data(0x00)
     
         self.send_command(0x11) #data entry mode   (command to set data entry parameters)
-        self.send_data(0x11) # tell it to use option "11" (3 in binary) to increment in -Y +X direction
+        self.send_data(0x07) # tell it to use option "0x03" (3 in binary) to increment in -Y +X direction
 
         self.send_command(0x21) #  Display update control
         self.send_data(0x00)
-        self.send_data(0x80)
+        self.send_data(0x00)
     
         self.SetCursor(0, 0) 
         self.ReadBusy()
 
         self.SetLut(self.WS_20_30)
 
-        self.SetWindow(0, 0, self.width-1, self.height-1)
+        self.SetWindow(0, 0, self.width, self.height)
         # EPD hardware init end
         return 0
 
@@ -265,15 +268,31 @@ class EPD:
         self.send_data2(pattern)   
         self.TurnOnDisplay()
 
+    def buildBuffer(self, p1, p2):
+        counter = 0
+        buffer = []
+        #populate horizontal pattern
+        for row in range(int(self.height/8)):  
+            for y in range(7):
+                for i in range(int(self.width/8)):
+                    buffer.append(p1)
+                    counter += 1
+            #populate vertical pattern
+            for y in range(int(self.width/8)):
+                buffer.append(p2)
+                counter += 1
+        print(buffer)
+        print(counter)
+        return buffer
+
+
     def Clear(self, color):
-        if self.width%8 == 0:
-            linewidth = int(self.width/8)
-        else:
-            linewidth = int(self.width/8) + 1
 
         self.send_command(0x24) # WRITE_RAM
-        self.send_data2([color] * (int(self.width/8) * self.height)) 
+        self.send_data2(self.buildBuffer(0x7F, 0x00))
         self.TurnOnDisplay()
+
+
 
     def sleep(self):
         self.send_command(0x10) # DEEP_SLEEP_MODE
