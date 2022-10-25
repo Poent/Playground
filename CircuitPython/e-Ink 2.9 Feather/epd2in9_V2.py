@@ -27,7 +27,6 @@
 # THE SOFTWARE.
 #
 
-
 # MODIFICATIONS FROM ORIGINAL
 # Removed dependancy on python image library (PIL)
 # Implementing display based on CircuitPython compatible modules.
